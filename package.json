@@ -23,9 +23,11 @@
     ]
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.60.0",
-    "@sinclair/typebox": "0.34.48",
     "playwright": "^1.52.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
