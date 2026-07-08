@@ -19,15 +19,15 @@
   "type": "module",
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./index.ts"
     ]
   },
   "dependencies": {
     "playwright": "^1.52.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@sinclair/typebox": "*"
+    "@earendil-works/pi-coding-agent": ">=0.80.0",
+    "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
