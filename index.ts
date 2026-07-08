@@ -43,10 +43,10 @@ import consoleTools from './src/tools/console';
 import dialogTools from './src/tools/dialogs';
 import fileTools from './src/tools/files';
 import networkTools from './src/tools/network';
-import routeTools from './tools/route';
-import cookieTools from './tools/cookies';
-import webstorageTools from './tools/webstorage';
-import storageTools from './tools/storage';
+import routeTools from './src/tools/route';
+import cookieTools from './src/tools/cookies';
+import webstorageTools from './src/tools/webstorage';
+import storageTools from './src/tools/storage';
 
 // Helper type so params coming from pi can be cast safely
 type Params = Record<string, any>;
