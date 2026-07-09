@@ -26,8 +26,8 @@
     "playwright": "^1.52.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.80.0",
-    "@sinclair/typebox": "^0.34.0"
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

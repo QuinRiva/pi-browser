@@ -23,7 +23,7 @@
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import { BrowserSession } from './src/browser-session';
 import { BrowserToolResult } from './src/response';
 import type { Context } from './src/context';
