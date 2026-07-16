@@ -51,11 +51,17 @@ import storageTools from './tools/storage';
 // Helper type so params coming from pi can be cast safely
 type Params = Record<string, any>;
 
+// Default config used for both the /browser command and lazy auto-launch.
+const DEFAULT_CONFIG = { timeouts: { action: 10000, navigation: 30000 } };
+
 function makeTool(session: BrowserSession, tool: Tool) {
   return async (params: Params) => {
+    // Auto-launch a headless browser on first tool use so the agent does not
+    // need the user to run /browser launch first. Set PI_BROWSER_HEADED=1 to
+    // launch headed (requires a display).
+    if (!session.context)
+      await session.connect({ type: 'launch', browserName: 'chromium' }, DEFAULT_CONFIG);
     const context = session.context;
-    if (!context)
-      throw new Error('Browser not connected. Use /browser connect [port] or /browser launch first.');
     const result = new BrowserToolResult(context as Context);
     await tool.handle(context as Context, params, result);
     return result.build();
@@ -139,11 +145,12 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_take_screenshot',
     label: 'Take screenshot',
-    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect.",
+    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
     parameters: Type.Object({
       type: Type.Optional(Type.String({ description: 'Image format: png or jpeg (default: png)' })),
       selector: Type.Optional(Type.String({ description: 'CSS selector of element to screenshot' })),
       fullPage: Type.Optional(Type.Boolean({ description: 'Capture the full scrollable page' })),
+      filename: Type.Optional(Type.String({ description: 'Path to save the screenshot to. Relative paths resolve against the current working directory; parent directories are created. Omit to only return the image inline.' })),
     }),
     async execute(_id, params) {
       const r = await run('browser_take_screenshot')(params as Params);
