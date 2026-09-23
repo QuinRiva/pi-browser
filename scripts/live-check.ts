@@ -1,5 +1,5 @@
 /**
- * Manual live verification against a real Chromium: `npx jiti scripts/live-check.ts`.
+ * Manual live verification against a real Chromium: `npx jiti@2 scripts/live-check.ts`.
  * Not part of the vitest suite — it launches a browser and hits the network.
  * Covers the things unit tests cannot: terse vs full result sizes on a real page,
  * the spill file, hover-intent popovers, and screenshot format/scroll-container notes.

@@ -48,11 +48,9 @@ export const networkRequests = defineTabTool({
       if (filter && !filter.test(req.url())) continue;
       lines.push(await renderRequest(req, params.requestBody ?? false, params.requestHeaders ?? false));
     }
-    const MAX = 20_000;
-    let text = lines.join('\n') || 'No matching requests.';
-    if (text.length > MAX)
-      text = text.slice(0, MAX) + `\n[truncated, ${lines.length} requests total]`;
-    result.addTextResult(text);
+    // No clamp here: an oversized result is excerpted and spilled to a file by the
+    // result builder, so the requests past the excerpt stay reachable.
+    result.addTextResult(lines.join('\n') || 'No matching requests.');
   },
 });
 

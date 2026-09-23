@@ -24,11 +24,9 @@ export const consoleMessages = defineTabTool({
       result.addTextResult('No console messages.');
       return;
     }
-    const MAX = 10_000;
-    let text = msgs.map(m => m.toString()).join('\n');
-    if (text.length > MAX)
-      text = text.slice(0, MAX) + `\n[truncated, ${msgs.length} messages total]`;
-    result.addTextResult(text);
+    // No clamp here: an oversized result is excerpted and spilled to a file by the
+    // result builder, so the messages past the excerpt stay reachable.
+    result.addTextResult(msgs.map(m => m.toString()).join('\n'));
   },
 });
 
