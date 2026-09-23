@@ -67,6 +67,18 @@ If you run multiple browsers at the same time, give each a different port. Two b
 
 Once connected, the browser tools are available for the rest of the session.
 
+## Results are terse by default
+
+Action tools return what you almost always need — URL, title, the Playwright code that
+ran, and any modal state — not the page's accessibility tree. Pass `snapshot: true` to an
+action, or call `browser_snapshot`, when you actually need element refs. To confirm an
+action landed, `browser_evaluate` returning the one value you care about is cheaper than
+any tree.
+
+Any result over 20KB is excerpted inline (with long single lines bounded) and written in
+full to a file under `$TMPDIR/pi-browser-results/`; the path is in the result, so nothing
+becomes unreachable — `rg` the file for the rest.
+
 ## Tools
 
 ### Navigation
@@ -82,14 +94,14 @@ Once connected, the browser tools are available for the rest of the session.
 | Tool | Description |
 |------|-------------|
 | `browser_snapshot` | Capture the accessibility tree; returns element refs for interaction |
-| `browser_take_screenshot` | Take a screenshot of the page or a specific element |
+| `browser_take_screenshot` | Take a screenshot of the page or a specific element (JPEG by default) |
 
 ### Interaction
 
 | Tool | Description |
 |------|-------------|
 | `browser_click` | Click an element (by ref, selector, or description) |
-| `browser_hover` | Hover over an element |
+| `browser_hover` | Hover over an element, with a real pointer move and settle so hover-intent popovers open |
 | `browser_drag` | Drag from one element to another |
 | `browser_type` | Type text into a field |
 | `browser_press_key` | Press a keyboard key |

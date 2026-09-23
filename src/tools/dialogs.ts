@@ -23,7 +23,6 @@ export const handleDialog = defineTabTool({
 
     result.addTextResult(`Dialog ${params.accept ? 'accepted' : 'dismissed'}.`);
     result.addCode(`await dialog.${params.accept ? `accept(${params.promptText ? JSON.stringify(params.promptText) : ''})` : 'dismiss()'};`);
-    result.setIncludeSnapshot();
   },
 });
 

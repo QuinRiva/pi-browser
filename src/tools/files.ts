@@ -21,7 +21,6 @@ export const fileUpload = defineTabTool({
 
     result.addTextResult(params.paths?.length ? `Uploaded: ${params.paths.join(', ')}` : 'File chooser cancelled.');
     result.addCode(`await fileChooser.setFiles(${JSON.stringify(params.paths ?? [])});`);
-    result.setIncludeSnapshot();
   },
 });
 

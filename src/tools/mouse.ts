@@ -48,7 +48,6 @@ export const mouseClickXY = defineTabTool({
     if (params.delay) opts.delay = params.delay;
     await tab.waitForCompletion(async () => { await tab.page.mouse.click(params.x, params.y, opts); });
     result.addCode(`await page.mouse.click(${params.x}, ${params.y}${Object.keys(opts).length ? ', ' + JSON.stringify(opts) : ''});`);
-    result.setIncludeSnapshot();
   },
 });
 
@@ -63,7 +62,6 @@ export const mouseDragXY = defineTabTool({
       await tab.page.mouse.up();
     });
     result.addCode(`await page.mouse.move(${params.startX}, ${params.startY});\nawait page.mouse.down();\nawait page.mouse.move(${params.endX}, ${params.endY});\nawait page.mouse.up();`);
-    result.setIncludeSnapshot();
   },
 });
 

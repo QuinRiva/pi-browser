@@ -39,7 +39,6 @@ silently fails on a reactive app.`,
       if (params.submit) {
         await locator.press('Enter', tab.actionTimeoutOptions);
         result.addCode(`await page.${resolved}.press('Enter');`);
-        result.setIncludeSnapshot();
       }
     });
   },
@@ -56,7 +55,6 @@ export const pressKey = defineTabTool({
   handle: async (tab, params, result) => {
     result.addCode(`await page.keyboard.press('${params.key}');`);
     if (params.key === 'Enter') {
-      result.setIncludeSnapshot();
       await tab.waitForCompletion(() => tab.page.keyboard.press('Enter'));
     } else {
       await tab.page.keyboard.press(params.key);
