@@ -7,6 +7,10 @@ import * as pw from 'playwright';
 import { Context } from './context';
 import type { ContextConfig } from './context';
 
+// Headless VMs have no DISPLAY; default to headless. Set PI_BROWSER_HEADED=1 to
+// force a headed browser (only works when an X server / display is available).
+const HEADLESS = !process.env.PI_BROWSER_HEADED;
+
 export type ConnectionMode =
   | { type: 'cdp'; port: number }
   | { type: 'launch'; browserName?: 'chromium' | 'firefox' | 'webkit' }
@@ -53,7 +57,7 @@ export class BrowserSession {
       case 'launch': {
         const browserType = pw[mode.browserName ?? 'chromium'];
         const browserContext = await browserType.launchPersistentContext('', {
-          headless: false,
+          headless: HEADLESS,
           handleSIGINT: false,
           handleSIGTERM: false,
         });
@@ -65,7 +69,7 @@ export class BrowserSession {
       case 'isolated': {
         const browserType = pw[mode.browserName ?? 'chromium'];
         this._browser = await browserType.launch({
-          headless: false,
+          headless: HEADLESS,
           handleSIGINT: false,
           handleSIGTERM: false,
         });
