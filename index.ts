@@ -22,31 +22,31 @@
  *   browser_close, browser_resize
  */
 
-import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
-import { Type } from '@sinclair/typebox';
-import { BrowserSession } from './browser-session';
-import { BrowserToolResult } from './response';
-import type { Context } from './context';
-import type { Tool } from './tool';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { Type } from 'typebox';
+import { BrowserSession } from './src/browser-session';
+import { BrowserToolResult } from './src/response';
+import type { Context } from './src/context';
+import type { Tool } from './src/tool';
 
-import navigateTools from './tools/navigate';
-import snapshotTools from './tools/snapshot';
-import keyboardTools from './tools/keyboard';
-import formTools from './tools/form';
-import screenshotTools from './tools/screenshot';
-import tabTools from './tools/tabs';
-import evaluateTools from './tools/evaluate';
-import waitTools from './tools/wait';
-import commonTools from './tools/common';
-import mouseTools from './tools/mouse';
-import consoleTools from './tools/console';
-import dialogTools from './tools/dialogs';
-import fileTools from './tools/files';
-import networkTools from './tools/network';
-import routeTools from './tools/route';
-import cookieTools from './tools/cookies';
-import webstorageTools from './tools/webstorage';
-import storageTools from './tools/storage';
+import navigateTools from './src/tools/navigate';
+import snapshotTools from './src/tools/snapshot';
+import keyboardTools from './src/tools/keyboard';
+import formTools from './src/tools/form';
+import screenshotTools from './src/tools/screenshot';
+import tabTools from './src/tools/tabs';
+import evaluateTools from './src/tools/evaluate';
+import waitTools from './src/tools/wait';
+import commonTools from './src/tools/common';
+import mouseTools from './src/tools/mouse';
+import consoleTools from './src/tools/console';
+import dialogTools from './src/tools/dialogs';
+import fileTools from './src/tools/files';
+import networkTools from './src/tools/network';
+import routeTools from './src/tools/route';
+import cookieTools from './src/tools/cookies';
+import webstorageTools from './src/tools/webstorage';
+import storageTools from './src/tools/storage';
 
 // Helper type so params coming from pi can be cast safely
 type Params = Record<string, any>;
