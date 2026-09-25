@@ -39,7 +39,6 @@ whereas \`locator.fill()\` sets the DOM value directly and may bypass reactivity
         result.addCode(`${src}.selectOption(${JSON.stringify(field.value)});`);
       }
     }
-    result.setIncludeSnapshot();
   },
 });
 

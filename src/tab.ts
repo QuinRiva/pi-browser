@@ -13,7 +13,6 @@ export type ModalState =
 
 export type TabSnapshot = {
   ariaSnapshot: string;
-  ariaSnapshotDiff?: string;
   modalStates: ModalState[];
 };
 

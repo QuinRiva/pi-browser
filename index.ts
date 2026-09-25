@@ -51,12 +51,35 @@ import storageTools from './src/tools/storage';
 // Helper type so params coming from pi can be cast safely
 type Params = Record<string, any>;
 
+// Default config used for both the /browser command and lazy auto-launch.
+const DEFAULT_CONFIG = { timeouts: { action: 10000, navigation: 30000 } };
+
+// Tools that can return the page's accessibility tree on request. Everything else
+// never mentions snapshots at all.
+const SNAPSHOT_TOOLS = new Set([
+  'browser_navigate', 'browser_navigate_back', 'browser_reload',
+  'browser_click', 'browser_hover', 'browser_select_option', 'browser_drag',
+  'browser_type', 'browser_press_key', 'browser_fill_form',
+  'browser_wait_for', 'browser_file_upload', 'browser_handle_dialog',
+  'browser_mouse_click_xy', 'browser_mouse_drag_xy',
+]);
+
+const snapshotParam = Type.Optional(Type.Boolean({
+  description: 'Include the full accessibility tree of the resulting page. Default false — the tree is by far the largest thing a browser result can carry. Ask for it only when you need element refs.',
+}));
+
 function makeTool(session: BrowserSession, tool: Tool) {
   return async (params: Params) => {
+    // Auto-launch a headless browser on first tool use so the agent does not
+    // need the user to run /browser launch first. Set PI_BROWSER_HEADED=1 to
+    // launch headed (requires a display).
+    if (!session.context)
+      await session.connect({ type: 'launch', browserName: 'chromium' }, DEFAULT_CONFIG);
     const context = session.context;
-    if (!context)
-      throw new Error('Browser not connected. Use /browser connect [port] or /browser launch first.');
-    const result = new BrowserToolResult(context as Context);
+    const result = new BrowserToolResult(context as Context, SNAPSHOT_TOOLS.has(tool.schema.name));
+    // Accessibility trees are opt-in on every tool: they are the single largest
+    // thing a browser result can carry, and most actions do not need one.
+    if (params.snapshot) result.setIncludeSnapshot();
     await tool.handle(context as Context, params, result);
     return result.build();
   };
@@ -87,7 +110,7 @@ export default function (pi: ExtensionAPI) {
     name: 'browser_navigate',
     label: 'Navigate to URL',
     description: 'Navigate to a URL',
-    parameters: Type.Object({ url: Type.String({ description: 'URL to navigate to' }) }),
+    parameters: Type.Object({ url: Type.String({ description: 'URL to navigate to' }), snapshot: snapshotParam }),
     async execute(_id, params) {
       const r = await run('browser_navigate')(params as Params);
       return { content: r.content as any, details: r.details };
@@ -98,7 +121,7 @@ export default function (pi: ExtensionAPI) {
     name: 'browser_navigate_back',
     label: 'Go back',
     description: 'Go back to the previous page in the history',
-    parameters: Type.Object({}),
+    parameters: Type.Object({ snapshot: snapshotParam }),
     async execute(_id, params) {
       const r = await run('browser_navigate_back')(params as Params);
       return { content: r.content as any, details: r.details };
@@ -109,7 +132,7 @@ export default function (pi: ExtensionAPI) {
     name: 'browser_reload',
     label: 'Reload page',
     description: 'Reload the current page',
-    parameters: Type.Object({}),
+    parameters: Type.Object({ snapshot: snapshotParam }),
     async execute(_id, params) {
       const r = await run('browser_reload')(params as Params);
       return { content: r.content as any, details: r.details };
@@ -121,11 +144,11 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_snapshot',
     label: 'Page snapshot',
-    description: 'Capture the accessibility tree of the current page to find element refs for interaction. Do NOT call after every action to confirm results — check the snapshot included in action responses instead. Use selector param to scope to a specific section if the page is large.',
+    description: 'Capture the accessibility tree of the current page to find element refs for interaction. Action tools do not return a tree unless you pass snapshot: true, so call this when you actually need refs — scoped with selector where possible, since a whole-page tree is the most expensive result a browser tool can return.',
     promptGuidelines: [
-      'Call browser_snapshot only when you need to find an element ref to interact with, not to confirm results.',
-      'Action tools (browser_click, browser_type, etc.) already include a snapshot in their response — do not call browser_snapshot again afterwards.',
-      'If the snapshot is too large, re-call with a selector scoped to the relevant section of the page.',
+      'Action tools (browser_click, browser_type, browser_navigate, ...) return a terse result: URL, title and what ran. Pass snapshot: true on the action, or call browser_snapshot afterwards, when you need the accessibility tree — do not assume one comes for free.',
+      'To confirm an action landed, prefer browser_evaluate returning the one value you care about (e.g. an element\'s innerText) over pulling a whole tree.',
+      'Any oversized browser result is excerpted inline and written in full to a file whose path is in the result — rg that file instead of re-running the tool.',
     ],
     parameters: Type.Object({
       selector: Type.Optional(Type.String({ description: 'CSS selector for partial snapshot' })),
@@ -139,11 +162,12 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_take_screenshot',
     label: 'Take screenshot',
-    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect.",
+    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to JPEG (same token cost as PNG, a third of the bytes on disk and on the wire); pass type: 'png' for lossless pixels. Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
     parameters: Type.Object({
-      type: Type.Optional(Type.String({ description: 'Image format: png or jpeg (default: png)' })),
+      type: Type.Optional(Type.String({ description: "Image format: jpeg (default) or png. A .png filename implies png." })),
       selector: Type.Optional(Type.String({ description: 'CSS selector of element to screenshot' })),
-      fullPage: Type.Optional(Type.Boolean({ description: 'Capture the full scrollable page' })),
+      fullPage: Type.Optional(Type.Boolean({ description: "Capture the full scrollable page. Applies to page screenshots only — an element screenshot always captures the whole element, and says so when content overflows the element's box." })),
+      filename: Type.Optional(Type.String({ description: 'Path to save the screenshot to. Relative paths resolve against the current working directory; parent directories are created. Omit to only return the image inline.' })),
     }),
     async execute(_id, params) {
       const r = await run('browser_take_screenshot')(params as Params);
@@ -164,6 +188,7 @@ export default function (pi: ExtensionAPI) {
       doubleClick: Type.Optional(Type.Boolean({ description: 'Double-click instead of single click' })),
       button: Type.Optional(Type.String({ description: 'Mouse button: left, right, or middle' })),
       modifiers: Type.Optional(Type.Array(Type.String(), { description: 'Modifier keys: Alt, Control, Shift, Meta' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_click')(params as Params);
@@ -174,11 +199,13 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_hover',
     label: 'Hover',
-    description: 'Hover over an element on the page',
+    description: 'Hover over an element on the page. Dispatches a real pointer move and then settles (default 400ms), so hover-intent popovers and tooltips open; raise settleMs for slower ones.',
     parameters: Type.Object({
       ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
       selector: Type.Optional(Type.String({ description: 'CSS selector' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
+      settleMs: Type.Optional(Type.Number({ description: 'Milliseconds to keep the pointer still after moving (default 400, max 5000)' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_hover')(params as Params);
@@ -195,6 +222,7 @@ export default function (pi: ExtensionAPI) {
       selector: Type.Optional(Type.String({ description: 'CSS selector' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
       values: Type.Array(Type.String(), { description: 'Values to select' }),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_select_option')(params as Params);
@@ -213,6 +241,7 @@ export default function (pi: ExtensionAPI) {
       endRef: Type.Optional(Type.String({ description: 'Target element reference' })),
       endSelector: Type.Optional(Type.String({ description: 'Target CSS selector' })),
       endElement: Type.Optional(Type.String({ description: 'Target element description' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_drag')(params as Params);
@@ -233,6 +262,7 @@ export default function (pi: ExtensionAPI) {
       text: Type.String({ description: 'Text to type' }),
       submit: Type.Optional(Type.Boolean({ description: 'Press Enter after typing' })),
       slowly: Type.Optional(Type.Boolean({ description: 'Type one character at a time' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_type')(params as Params);
@@ -246,6 +276,7 @@ export default function (pi: ExtensionAPI) {
     description: 'Press a key on the keyboard',
     parameters: Type.Object({
       key: Type.String({ description: 'Key name such as ArrowLeft, Enter, or a character like a' }),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_press_key')(params as Params);
@@ -265,6 +296,7 @@ export default function (pi: ExtensionAPI) {
         selector: Type.Optional(Type.String({ description: 'CSS selector' })),
         value: Type.String({ description: 'Value to fill' }),
       }), { description: 'Fields to fill' }),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_fill_form')(params as Params);
@@ -316,6 +348,7 @@ export default function (pi: ExtensionAPI) {
       time: Type.Optional(Type.Number({ description: 'Seconds to wait' })),
       text: Type.Optional(Type.String({ description: 'Text to wait to appear' })),
       textGone: Type.Optional(Type.String({ description: 'Text to wait to disappear' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) {
       const r = await run('browser_wait_for')(params as Params);
@@ -355,7 +388,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_mouse_move_xy',
     label: 'Move mouse',
-    description: 'Move mouse to an absolute x/y coordinate',
+    description: 'Move mouse to an absolute x/y coordinate. Use this (optionally twice, to a nearby point then the target) when an element needs genuine pointer movement; browser_hover already does this for ref/selector targets.',
     parameters: Type.Object({
       x: Type.Number({ description: 'X coordinate' }),
       y: Type.Number({ description: 'Y coordinate' }),
@@ -373,6 +406,7 @@ export default function (pi: ExtensionAPI) {
       button: Type.Optional(Type.String({ description: 'left, right, or middle' })),
       clickCount: Type.Optional(Type.Number({ description: 'Number of clicks' })),
       delay: Type.Optional(Type.Number({ description: 'Delay between mousedown and mouseup in ms' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) { const r = await run('browser_mouse_click_xy')(params as Params); return { content: r.content as any, details: r.details }; },
   });
@@ -386,6 +420,7 @@ export default function (pi: ExtensionAPI) {
       startY: Type.Number({ description: 'Start Y' }),
       endX: Type.Number({ description: 'End X' }),
       endY: Type.Number({ description: 'End Y' }),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) { const r = await run('browser_mouse_drag_xy')(params as Params); return { content: r.content as any, details: r.details }; },
   });
@@ -446,6 +481,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       accept: Type.Boolean({ description: 'true to accept, false to dismiss' }),
       promptText: Type.Optional(Type.String({ description: 'Text to enter for prompt dialogs' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) { const r = await run('browser_handle_dialog')(params as Params); return { content: r.content as any, details: r.details }; },
   });
@@ -458,6 +494,7 @@ export default function (pi: ExtensionAPI) {
     description: 'Upload files via an open file chooser. Trigger a file input first, then call this.',
     parameters: Type.Object({
       paths: Type.Optional(Type.Array(Type.String(), { description: 'Absolute paths to files to upload' })),
+      snapshot: snapshotParam,
     }),
     async execute(_id, params) { const r = await run('browser_file_upload')(params as Params); return { content: r.content as any, details: r.details }; },
   });

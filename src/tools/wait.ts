@@ -32,7 +32,6 @@ export const waitFor = defineTool({
     }
 
     result.addTextResult(`Waited for ${params.text ?? params.textGone ?? `${params.time}s`}`);
-    result.setIncludeSnapshot();
   },
 });
 

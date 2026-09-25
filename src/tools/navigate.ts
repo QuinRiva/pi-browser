@@ -16,7 +16,6 @@ export const navigate = defineTool({
     }
     await tab.navigate(url);
     result.addCode(`await page.goto('${url}');`);
-    result.setIncludeSnapshot();
   },
 });
 
@@ -31,7 +30,6 @@ export const goBack = defineTabTool({
   handle: async (tab, _params, result) => {
     await tab.page.goBack(tab.navigationTimeoutOptions);
     result.addCode('await page.goBack();');
-    result.setIncludeSnapshot();
   },
 });
 
@@ -46,7 +44,6 @@ export const reload = defineTabTool({
   handle: async (tab, _params, result) => {
     await tab.page.reload(tab.navigationTimeoutOptions);
     result.addCode('await page.reload();');
-    result.setIncludeSnapshot();
   },
 });
 
