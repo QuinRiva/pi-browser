@@ -7,12 +7,12 @@ export const screenshot = defineTabTool({
   schema: {
     name: 'browser_take_screenshot',
     title: 'Take a screenshot',
-    description: "Take a screenshot of the current page. You can't interact based on screenshots; use browser_snapshot for that. Defaults to JPEG (same token cost as PNG, a third of the bytes on disk and on the wire) — pass type: 'png' when you need lossless pixels. Pass filename to also save the image to disk (e.g. for evidence in a report); the saved path is returned in the result, and the format follows the filename extension unless type says otherwise. With a selector the element is captured in full (fullPage applies to the page only); if content overflows the element's box the result says so and names the fix.",
+    description: "Take a screenshot of the current page. You can't interact based on screenshots; use browser_snapshot for that. Defaults to PNG so small text and thin lines stay crisp; type: 'jpeg' (q80) costs the same tokens and about a third of the bytes when size on disk or on the wire matters more than fidelity. Pass filename to also save the image to disk (e.g. for evidence in a report); the saved path is returned in the result, and the format follows the filename extension unless type says otherwise. With a selector the element is captured in full (fullPage applies to the page only); if content overflows the element's box the result says so and names the fix.",
     type: 'readOnly',
   },
   handle: async (tab, params, result) => {
-    const fromFilename = String(params.filename ?? '').toLowerCase().endsWith('.png') ? 'png' : undefined;
-    const imageType: 'png' | 'jpeg' = (params.type ?? fromFilename ?? 'jpeg') === 'png' ? 'png' : 'jpeg';
+    const fromFilename = /\.jpe?g$/i.test(String(params.filename ?? '')) ? 'jpeg' : undefined;
+    const imageType: 'png' | 'jpeg' = (params.type ?? fromFilename) === 'jpeg' ? 'jpeg' : 'png';
     const options: Record<string, any> = {
       type: imageType,
       scale: 'css',
