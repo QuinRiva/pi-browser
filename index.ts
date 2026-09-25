@@ -162,9 +162,9 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_take_screenshot',
     label: 'Take screenshot',
-    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to JPEG (same token cost as PNG, a third of the bytes on disk and on the wire); pass type: 'png' for lossless pixels. Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
+    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to PNG so small text and thin lines stay crisp; pass type: 'jpeg' when bytes on disk or on the wire matter more than fidelity (same token cost, about a third of the bytes). Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
     parameters: Type.Object({
-      type: Type.Optional(Type.String({ description: "Image format: jpeg (default) or png. A .png filename implies png." })),
+      type: Type.Optional(Type.String({ description: "Image format: png (default) or jpeg. A .jpg/.jpeg filename implies jpeg." })),
       selector: Type.Optional(Type.String({ description: 'CSS selector of element to screenshot' })),
       fullPage: Type.Optional(Type.Boolean({ description: "Capture the full scrollable page. Applies to page screenshots only — an element screenshot always captures the whole element, and says so when content overflows the element's box." })),
       filename: Type.Optional(Type.String({ description: 'Path to save the screenshot to. Relative paths resolve against the current working directory; parent directories are created. Omit to only return the image inline.' })),

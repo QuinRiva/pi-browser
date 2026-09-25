@@ -73,9 +73,9 @@ describe('browser_take_screenshot format', () => {
     return (built.content.find(c => c.type === 'image') as { mimeType: string }).mimeType;
   };
 
-  it('defaults to jpeg', async () => expect(await mimeOf({})).toBe('image/jpeg'));
-  it('honours an explicit png request', async () => expect(await mimeOf({ type: 'png' })).toBe('image/png'));
-  it('follows a .png filename', async () => expect(await mimeOf({ filename: path.join(os.tmpdir(), 'pi-browser-test-shot.png') })).toBe('image/png'));
+  it('defaults to png', async () => expect(await mimeOf({})).toBe('image/png'));
+  it('honours an explicit jpeg request', async () => expect(await mimeOf({ type: 'jpeg' })).toBe('image/jpeg'));
+  it('follows a .jpg filename', async () => expect(await mimeOf({ filename: path.join(os.tmpdir(), 'pi-browser-test-shot.jpg') })).toBe('image/jpeg'));
 });
 
 describe('element screenshots report what they could not capture', () => {

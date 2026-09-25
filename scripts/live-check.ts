@@ -77,10 +77,10 @@ await call('browser_hover', { selector: '#hoverme' });
 console.log('\npopover opened by browser_hover:', (await call('browser_snapshot', { selector: '#pop' })).text.includes('POPOVER'));
 
 // 4. screenshots: default format + fullPage×selector
-const jpeg = await call('browser_take_screenshot', {});
-console.log('default screenshot mime:', jpeg.images[0].mimeType, 'bytes:', Buffer.from(jpeg.images[0].data, 'base64').length);
-const png = await call('browser_take_screenshot', { type: 'png' });
-console.log('png screenshot bytes:', Buffer.from(png.images[0].data, 'base64').length);
+const png = await call('browser_take_screenshot', {});
+console.log('default screenshot mime:', png.images[0].mimeType, 'bytes:', Buffer.from(png.images[0].data, 'base64').length);
+const jpeg = await call('browser_take_screenshot', { type: 'jpeg' });
+console.log('jpeg screenshot bytes:', Buffer.from(jpeg.images[0].data, 'base64').length);
 const { execSync } = await import('node:child_process');
 const tallPath = path.join(os.tmpdir(), 'pi-browser-tall.jpg');
 const tallShot = await call('browser_take_screenshot', { selector: '#tall', fullPage: true, filename: tallPath });

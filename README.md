@@ -94,7 +94,7 @@ becomes unreachable — `rg` the file for the rest.
 | Tool | Description |
 |------|-------------|
 | `browser_snapshot` | Capture the accessibility tree; returns element refs for interaction |
-| `browser_take_screenshot` | Take a screenshot of the page or a specific element (JPEG by default) |
+| `browser_take_screenshot` | Take a screenshot of the page or a specific element (PNG by default, JPEG on request) |
 
 ### Interaction
 
