@@ -8,7 +8,7 @@ export const snapshot = defineTool({
     description: [
       'Capture the accessibility tree of the current page to identify elements for interaction.',
       'Use this to find element refs before clicking, typing, or filling forms.',
-      'Action tools no longer return a tree unless you pass snapshot: true, so call this when you need one — but prefer the selector param to scope it, or browser_evaluate to read one specific value, since a whole-page tree is the most expensive thing a browser tool can return.',
+      'Action tools do not return a tree unless you pass snapshot: true, so call this when you need one — but prefer the selector param to scope it, or browser_evaluate to read one specific value, since a whole-page tree is the most expensive thing a browser tool can return.',
       'Oversized output is excerpted inline and written in full to a file whose path is returned; rg that file for the rest.',
     ].join(' '),
     type: 'readOnly',

@@ -148,7 +148,6 @@ export default function (pi: ExtensionAPI) {
     promptGuidelines: [
       'Action tools (browser_click, browser_type, browser_navigate, ...) return a terse result: URL, title and what ran. Pass snapshot: true on the action, or call browser_snapshot afterwards, when you need the accessibility tree — do not assume one comes for free.',
       'To confirm an action landed, prefer browser_evaluate returning the one value you care about (e.g. an element\'s innerText) over pulling a whole tree.',
-      'Scope large pages with the selector param rather than snapshotting the whole document.',
       'Any oversized browser result is excerpted inline and written in full to a file whose path is in the result — rg that file instead of re-running the tool.',
     ],
     parameters: Type.Object({
@@ -163,7 +162,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: 'browser_take_screenshot',
     label: 'Take screenshot',
-    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to JPEG (same token cost as PNG, a third of the bytes stored and replayed); pass type: 'png' for lossless pixels. Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
+    description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to JPEG (same token cost as PNG, a third of the bytes on disk and on the wire); pass type: 'png' for lossless pixels. Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
     parameters: Type.Object({
       type: Type.Optional(Type.String({ description: "Image format: jpeg (default) or png. A .png filename implies png." })),
       selector: Type.Optional(Type.String({ description: 'CSS selector of element to screenshot' })),
