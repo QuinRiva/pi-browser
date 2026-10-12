@@ -104,9 +104,33 @@ export default function (pi: ExtensionAPI) {
     return makeTool(session, tool);
   }
 
+  // Fifty tools are too many to declare in every prompt, so they register `deferred`: pi's
+  // tool_search finds and loads the ones a task needs. A session without pi's built-in
+  // tool_search (disabled, or a pi without tool exposure) could not reach them, so they
+  // re-register `direct` there.
+  type ToolDef = Parameters<ExtensionAPI['registerTool']>[0];
+  const tools: ToolDef[] = [];
+  let exposure = 'deferred';
+  const registerTool = (tool: ToolDef) => {
+    tools.push(tool);
+    pi.registerTool({ ...tool, exposure } as ToolDef);
+  };
+  const reconcileExposure = () => {
+    const p = pi as any;
+    const hasToolSearch = p.getAllTools().some((t: any) => t.name === 'tool_search' && t.sourceInfo?.path === 'builtin:tool-search');
+    if (!hasToolSearch && exposure === 'deferred') {
+      exposure = 'direct';
+      for (const tool of tools) pi.registerTool({ ...tool, exposure } as ToolDef);
+    }
+    if (hasToolSearch && !p.getActiveTools().includes('tool_search')) p.setActiveTools([...p.getActiveTools(), 'tool_search']);
+  };
+  pi.on('session_start', reconcileExposure);
+  // Tree navigation restores a saved loadout after session_start.
+  (pi as any).on('session_tree', reconcileExposure);
+
   // ---------- Navigation ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_navigate',
     label: 'Navigate to URL',
     description: 'Navigate to a URL',
@@ -117,7 +141,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_navigate_back',
     label: 'Go back',
     description: 'Go back to the previous page in the history',
@@ -128,7 +152,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_reload',
     label: 'Reload page',
     description: 'Reload the current page',
@@ -141,7 +165,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Observation ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_snapshot',
     label: 'Page snapshot',
     description: 'Capture the accessibility tree of the current page to find element refs for interaction. Action tools do not return a tree unless you pass snapshot: true, so call this when you actually need refs — scoped with selector where possible, since a whole-page tree is the most expensive result a browser tool can return.',
@@ -159,7 +183,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_take_screenshot',
     label: 'Take screenshot',
     description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to PNG so small text and thin lines stay crisp; pass type: 'jpeg' when bytes on disk or on the wire matter more than fidelity (same token cost, about a third of the bytes). Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
@@ -177,7 +201,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Interaction ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_click',
     label: 'Click',
     description: 'Click an element on the page',
@@ -196,7 +220,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_hover',
     label: 'Hover',
     description: 'Hover over an element on the page. Dispatches a real pointer move and then settles (default 400ms), so hover-intent popovers and tooltips open; raise settleMs for slower ones.',
@@ -213,7 +237,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_select_option',
     label: 'Select option',
     description: 'Select an option in a dropdown',
@@ -230,7 +254,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_drag',
     label: 'Drag',
     description: 'Drag and drop between two elements',
@@ -251,7 +275,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Input ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_type',
     label: 'Type text',
     description: 'Type text into an editable element',
@@ -270,7 +294,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_press_key',
     label: 'Press key',
     description: 'Press a key on the keyboard',
@@ -284,7 +308,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_fill_form',
     label: 'Fill form',
     description: 'Fill multiple form fields at once',
@@ -306,7 +330,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Tabs ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_tabs',
     label: 'Manage tabs',
     description: 'List, create, close, or select browser tabs',
@@ -322,7 +346,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Scripting ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_evaluate',
     label: 'Evaluate JavaScript',
     description: 'Evaluate a JavaScript expression on the current page',
@@ -340,7 +364,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Waiting ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_wait_for',
     label: 'Wait for',
     description: 'Wait for text to appear or disappear, or wait a specified number of seconds',
@@ -358,7 +382,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Window ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_close',
     label: 'Close page',
     description: 'Close the current browser page',
@@ -369,7 +393,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_resize',
     label: 'Resize window',
     description: 'Resize the browser window',
@@ -385,7 +409,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Mouse ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_mouse_move_xy',
     label: 'Move mouse',
     description: 'Move mouse to an absolute x/y coordinate. Use this (optionally twice, to a nearby point then the target) when an element needs genuine pointer movement; browser_hover already does this for ref/selector targets.',
@@ -396,7 +420,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_mouse_move_xy')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_mouse_click_xy',
     label: 'Click at coordinates',
     description: 'Click at an absolute x/y coordinate. Prefer browser_click with a ref/selector when possible.',
@@ -411,7 +435,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_mouse_click_xy')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_mouse_drag_xy',
     label: 'Drag between coordinates',
     description: 'Drag from one x/y coordinate to another',
@@ -425,7 +449,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_mouse_drag_xy')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_mouse_down',
     label: 'Mouse button down',
     description: 'Press and hold a mouse button',
@@ -433,7 +457,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_mouse_down')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_mouse_up',
     label: 'Mouse button up',
     description: 'Release a mouse button',
@@ -441,7 +465,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_mouse_up')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_mouse_wheel',
     label: 'Scroll',
     description: 'Scroll the mouse wheel by deltaX/deltaY pixels',
@@ -454,7 +478,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Console ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_console_messages',
     label: 'Console messages',
     description: 'Return console messages from the current page. Useful for debugging errors.',
@@ -464,7 +488,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_console_messages')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_console_clear',
     label: 'Clear console',
     description: 'Clear recorded console messages',
@@ -474,7 +498,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Dialogs ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_handle_dialog',
     label: 'Handle dialog',
     description: 'Accept or dismiss a browser dialog (alert, confirm, prompt)',
@@ -488,7 +512,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Files ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_file_upload',
     label: 'Upload files',
     description: 'Upload files via an open file chooser. Trigger a file input first, then call this.',
@@ -501,7 +525,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Network ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_network_requests',
     label: 'Network requests',
     description: 'List network requests made since last navigation. Useful for debugging API calls.',
@@ -514,7 +538,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_network_requests')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_network_clear',
     label: 'Clear network requests',
     description: 'Clear recorded network requests',
@@ -522,7 +546,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_network_clear')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_network_state_set',
     label: 'Set network state',
     description: 'Set the browser to online or offline mode',
@@ -532,7 +556,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Routes ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_route',
     label: 'Mock network requests',
     description: 'Intercept and mock network requests matching a URL pattern',
@@ -547,7 +571,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_route')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_route_list',
     label: 'List routes',
     description: 'List all active network route mocks',
@@ -555,7 +579,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_route_list')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_unroute',
     label: 'Remove routes',
     description: 'Remove network route mocks matching a pattern, or all if no pattern given',
@@ -565,7 +589,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Cookies ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_cookie_list',
     label: 'List cookies',
     description: 'List all cookies, optionally filtered by domain or path',
@@ -576,7 +600,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_cookie_list')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_cookie_get',
     label: 'Get cookie',
     description: 'Get a specific cookie by name',
@@ -584,7 +608,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_cookie_get')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_cookie_set',
     label: 'Set cookie',
     description: 'Set a cookie',
@@ -601,7 +625,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_cookie_set')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_cookie_delete',
     label: 'Delete cookie',
     description: 'Delete a specific cookie by name',
@@ -609,7 +633,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_cookie_delete')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_cookie_clear',
     label: 'Clear cookies',
     description: 'Clear all cookies',
@@ -625,7 +649,7 @@ export default function (pi: ExtensionAPI) {
     ['browser_sessionstorage_list', 'List sessionStorage', 'List all sessionStorage key-value pairs'],
     ['browser_sessionstorage_clear', 'Clear sessionStorage', 'Clear all sessionStorage'],
   ] as const) {
-    pi.registerTool({
+    registerTool({
       name, label, description: desc,
       parameters: Type.Object({}),
       async execute(_id, params) { const r = await run(name)(params as Params); return { content: r.content as any, details: r.details }; },
@@ -638,7 +662,7 @@ export default function (pi: ExtensionAPI) {
     ['browser_sessionstorage_get', 'Get sessionStorage item', 'Get a sessionStorage item by key', 'sessionStorage'],
     ['browser_sessionstorage_delete', 'Delete sessionStorage item', 'Delete a sessionStorage item', 'sessionStorage'],
   ] as const) {
-    pi.registerTool({
+    registerTool({
       name, label, description: desc,
       parameters: Type.Object({ key: Type.String({ description: `${store} key` }) }),
       async execute(_id, params) { const r = await run(name)(params as Params); return { content: r.content as any, details: r.details }; },
@@ -649,7 +673,7 @@ export default function (pi: ExtensionAPI) {
     ['browser_localstorage_set', 'Set localStorage item', 'Set a localStorage item', 'localStorage'],
     ['browser_sessionstorage_set', 'Set sessionStorage item', 'Set a sessionStorage item', 'sessionStorage'],
   ] as const) {
-    pi.registerTool({
+    registerTool({
       name, label, description: desc,
       parameters: Type.Object({
         key: Type.String({ description: `${store} key` }),
@@ -661,7 +685,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Storage state ----------
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_storage_state',
     label: 'Save storage state',
     description: 'Save cookies and localStorage to a JSON file',
@@ -669,7 +693,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) { const r = await run('browser_storage_state')(params as Params); return { content: r.content as any, details: r.details }; },
   });
 
-  pi.registerTool({
+  registerTool({
     name: 'browser_set_storage_state',
     label: 'Restore storage state',
     description: 'Restore cookies and localStorage from a previously saved file',
