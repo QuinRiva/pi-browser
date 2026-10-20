@@ -145,7 +145,7 @@ export class Tab {
     try {
       const root = selector ? this.page.locator(selector) : this.page.locator(':root');
       const ariaSnapshot = await Promise.race([
-        root.ariaSnapshot(),
+        root.ariaSnapshot({ mode: 'ai' }), // emits [ref=eN] and records them for aria-ref=
         new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
       ]) as string;
       return { ariaSnapshot, modalStates: this._modalStates };
@@ -164,8 +164,8 @@ export class Tab {
       return { locator, resolved: `locator(${JSON.stringify(params.selector)})` };
     }
     if (params.ref) {
-      const locator = this.page.locator(`aria/${params.ref}`);
-      return { locator, resolved: `locator('aria/${params.ref}')` };
+      const locator = this.page.locator(`aria-ref=${params.ref}`);
+      return { locator, resolved: `locator('aria-ref=${params.ref}')` };
     }
     throw new Error('Either ref or selector must be provided');
   }

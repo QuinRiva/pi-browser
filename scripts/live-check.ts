@@ -2,35 +2,28 @@
  * Manual live verification against a real Chromium: `npx jiti@2 scripts/live-check.ts`.
  * Not part of the vitest suite — it launches a browser and hits the network.
  * Covers the things unit tests cannot: terse vs full result sizes on a real page,
- * the spill file, hover-intent popovers, and screenshot format/scroll-container notes.
+ * the spill file, hover-intent popovers, screenshot format/scroll-container notes,
+ * and click-by-ref. Calls go through the extension's registered tools (a stub pi),
+ * so error hints and wiring are the real ones; pi's batch scheduling is not exercised.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BrowserSession } from '../src/browser-session.ts';
-import { BrowserToolResult } from '../src/response.ts';
-import type { Context } from '../src/context.ts';
-import navigateTools from '../src/tools/navigate.ts';
-import snapshotTools from '../src/tools/snapshot.ts';
-import screenshotTools from '../src/tools/screenshot.ts';
+import { chromium } from 'playwright';
+import extension from '../index.ts';
 
-const tools = new Map(
-  [...navigateTools, ...snapshotTools, ...screenshotTools].map(t => [t.schema.name, t])
-);
-const SNAPSHOT_CAPABLE = new Set(['browser_navigate', 'browser_click', 'browser_hover']);
-
-const session = new BrowserSession();
+const tools = new Map<string, any>();
+const shutdown: Function[] = [];
+extension({
+  registerTool: (t: any) => tools.set(t.name, t),
+  registerCommand: () => {},
+  on: (event: string, fn: Function) => { if (event === 'session_shutdown') shutdown.push(fn); },
+} as any);
 
 async function call(name: string, params: Record<string, any> = {}) {
-  if (!session.context)
-    await session.connect({ type: 'launch', browserName: 'chromium' }, { timeouts: { action: 10000, navigation: 30000 } });
-  const ctx = session.context as Context;
-  const result = new BrowserToolResult(ctx, SNAPSHOT_CAPABLE.has(name));
-  if (params.snapshot) result.setIncludeSnapshot();
-  await tools.get(name)!.handle(ctx, params, result);
-  const built = await result.build();
+  const built = await tools.get(name)!.execute('live', params);
   const text = (built.content[0] as any).text as string;
-  const images = built.content.filter(c => c.type === 'image') as any[];
+  const images = built.content.filter((c: any) => c.type === 'image') as any[];
   return { text, bytes: Buffer.byteLength(text, 'utf8'), images };
 }
 
@@ -89,4 +82,44 @@ console.log(tallShot.text.split('\n').filter(l => l.startsWith('Note:')).join('\
 const boxShot = await call('browser_take_screenshot', { selector: '#scrollbox' });
 console.log('scroll container note:', boxShot.text.split('\n').filter(l => l.startsWith('Note:')).join('\n') || '(no note)');
 
-await session.disconnect();
+// 5. click by ref: refs from a full-page and a selector-scoped snapshot both resolve
+await call('browser_navigate', { url: 'file://' + fixture });
+const full = await call('browser_snapshot');
+const fullText = fs.readFileSync(full.text.match(/Full output written to (\S+)/)?.[1] ?? '/dev/null', 'utf8') || full.text;
+const fullRef = fullText.match(/button "Open" \[ref=(e\d+)\]/)?.[1];
+console.log('\nfull snapshot ref for #btn:', fullRef);
+const refClick = await call('browser_click', { ref: fullRef });
+console.log(refClick.text.split('\n').find(l => l.includes('aria-ref')));
+console.log('clicked by full-snapshot ref?', (await call('browser_evaluate', { function: '() => out.textContent' })).text.includes('CLICKED'));
+
+await call('browser_navigate', { url: 'file://' + fixture });
+const scoped = await call('browser_snapshot', { selector: '#btn' });
+console.log('scoped snapshot:', scoped.text.trim());
+const scopedRef = scoped.text.match(/\[ref=(e\d+)\]/)?.[1];
+await call('browser_click', { ref: scopedRef });
+console.log('clicked by scoped-snapshot ref?', (await call('browser_evaluate', { function: '() => out.textContent' })).text.includes('CLICKED'));
+
+// 6. failures carry the snapshot-and-ref hint, within the action timeout
+await call('browser_navigate', { url: 'file://' + fixture });
+for (const [label, params] of [
+  ['stale ref (after navigate)', { ref: scopedRef }],
+  ['selector matching nothing', { selector: '#nope' }],
+  ['ambiguous selector (strict mode)', { selector: 'li' }],
+] as const) {
+  const t0 = Date.now();
+  const err = await call('browser_click', params).then(() => null, (e: Error) => e.message);
+  console.log(`\n${label}: failed=${err !== null} after ${Date.now() - t0}ms, hint=${!!err?.includes('use its ref (e.g. ref: "e12")')}\n  ${err?.split('\n')[0]}\n  ${err?.split('\n').slice(-1)[0]}`);
+}
+
+// 7. cost of the [ref=eN] markers: raw full-page snapshot, default vs ai mode
+const browser = await chromium.launch();
+const page = await browser.newPage();
+for (const url of ['file://' + fixture, 'https://playwright.dev/', 'https://github.com/microsoft/playwright']) {
+  await page.goto(url, { waitUntil: 'load' });
+  const [d, a] = [await page.locator(':root').ariaSnapshot(), await page.locator(':root').ariaSnapshot({ mode: 'ai' })];
+  const [db, ab] = [Buffer.byteLength(d), Buffer.byteLength(a)];
+  console.log(`snapshot bytes ${url}: default ${db}, ai ${ab} (+${((ab / db - 1) * 100).toFixed(0)}%)`);
+}
+await browser.close();
+
+for (const fn of shutdown) await fn();

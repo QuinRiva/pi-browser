@@ -80,7 +80,14 @@ function makeTool(session: BrowserSession, tool: Tool) {
     // Accessibility trees are opt-in on every tool: they are the single largest
     // thing a browser result can carry, and most actions do not need one.
     if (params.snapshot) result.setIncludeSnapshot();
-    await tool.handle(context as Context, params, result);
+    try {
+      await tool.handle(context as Context, params, result);
+    } catch (e: any) {
+      // A selector/ref that matched nothing (timeout) or too much (strict mode): point at refs.
+      if (/waiting for locator\(|strict mode violation/.test(e?.message))
+        e.message += '\nTake a fresh browser_snapshot and use its ref (e.g. ref: "e12") instead of guessing a selector.';
+      throw e;
+    }
     return result.build();
   };
 }
@@ -112,6 +119,8 @@ export default function (pi: ExtensionAPI) {
   const tools: ToolDef[] = [];
   let exposure = 'deferred';
   const registerTool = (tool: ToolDef) => {
+    // Every tool drives the same browser and page, so pi must run a batch containing one in order.
+    tool = { ...tool, executionMode: 'sequential' };
     tools.push(tool);
     pi.registerTool({ ...tool, exposure } as ToolDef);
   };
@@ -175,7 +184,7 @@ export default function (pi: ExtensionAPI) {
       'Any oversized browser result is excerpted inline and written in full to a file whose path is in the result — rg that file instead of re-running the tool.',
     ],
     parameters: Type.Object({
-      selector: Type.Optional(Type.String({ description: 'CSS selector for partial snapshot' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector to scope the snapshot to' })),
     }) as any,
     async execute(_id, params) {
       const r = await run('browser_snapshot')(params as Params);
@@ -189,7 +198,7 @@ export default function (pi: ExtensionAPI) {
     description: "Take a screenshot of the current page. Use browser_snapshot for interactions; use this to visually inspect. Defaults to PNG so small text and thin lines stay crisp; pass type: 'jpeg' when bytes on disk or on the wire matter more than fidelity (same token cost, about a third of the bytes). Pass filename to also save the image to disk for evidence; the saved path is returned in the result.",
     parameters: Type.Object({
       type: Type.Optional(Type.String({ description: "Image format: png (default) or jpeg. A .jpg/.jpeg filename implies jpeg." })),
-      selector: Type.Optional(Type.String({ description: 'CSS selector of element to screenshot' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector of element to screenshot' })),
       fullPage: Type.Optional(Type.Boolean({ description: "Capture the full scrollable page. Applies to page screenshots only — an element screenshot always captures the whole element, and says so when content overflows the element's box." })),
       filename: Type.Optional(Type.String({ description: 'Path to save the screenshot to. Relative paths resolve against the current working directory; parent directories are created. Omit to only return the image inline.' })),
     }),
@@ -206,8 +215,8 @@ export default function (pi: ExtensionAPI) {
     label: 'Click',
     description: 'Click an element on the page',
     parameters: Type.Object({
-      ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
-      selector: Type.Optional(Type.String({ description: 'CSS selector' })),
+      ref: Type.Optional(Type.String({ description: 'Element ref from browser_snapshot, e.g. "e12"' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector (CSS, text=, role=, >> chains)' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
       doubleClick: Type.Optional(Type.Boolean({ description: 'Double-click instead of single click' })),
       button: Type.Optional(Type.String({ description: 'Mouse button: left, right, or middle' })),
@@ -225,8 +234,8 @@ export default function (pi: ExtensionAPI) {
     label: 'Hover',
     description: 'Hover over an element on the page. Dispatches a real pointer move and then settles (default 400ms), so hover-intent popovers and tooltips open; raise settleMs for slower ones.',
     parameters: Type.Object({
-      ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
-      selector: Type.Optional(Type.String({ description: 'CSS selector' })),
+      ref: Type.Optional(Type.String({ description: 'Element ref from browser_snapshot, e.g. "e12"' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector (CSS, text=, role=, >> chains)' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
       settleMs: Type.Optional(Type.Number({ description: 'Milliseconds to keep the pointer still after moving (default 400, max 5000)' })),
       snapshot: snapshotParam,
@@ -242,8 +251,8 @@ export default function (pi: ExtensionAPI) {
     label: 'Select option',
     description: 'Select an option in a dropdown',
     parameters: Type.Object({
-      ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
-      selector: Type.Optional(Type.String({ description: 'CSS selector' })),
+      ref: Type.Optional(Type.String({ description: 'Element ref from browser_snapshot, e.g. "e12"' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector (CSS, text=, role=, >> chains)' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
       values: Type.Array(Type.String(), { description: 'Values to select' }),
       snapshot: snapshotParam,
@@ -259,11 +268,11 @@ export default function (pi: ExtensionAPI) {
     label: 'Drag',
     description: 'Drag and drop between two elements',
     parameters: Type.Object({
-      startRef: Type.Optional(Type.String({ description: 'Source element reference' })),
-      startSelector: Type.Optional(Type.String({ description: 'Source CSS selector' })),
+      startRef: Type.Optional(Type.String({ description: 'Source element ref from browser_snapshot, e.g. "e12"' })),
+      startSelector: Type.Optional(Type.String({ description: 'Source Playwright selector' })),
       startElement: Type.Optional(Type.String({ description: 'Source element description' })),
-      endRef: Type.Optional(Type.String({ description: 'Target element reference' })),
-      endSelector: Type.Optional(Type.String({ description: 'Target CSS selector' })),
+      endRef: Type.Optional(Type.String({ description: 'Target element ref from browser_snapshot, e.g. "e12"' })),
+      endSelector: Type.Optional(Type.String({ description: 'Target Playwright selector' })),
       endElement: Type.Optional(Type.String({ description: 'Target element description' })),
       snapshot: snapshotParam,
     }),
@@ -280,8 +289,8 @@ export default function (pi: ExtensionAPI) {
     label: 'Type text',
     description: 'Type text into an editable element',
     parameters: Type.Object({
-      ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
-      selector: Type.Optional(Type.String({ description: 'CSS selector' })),
+      ref: Type.Optional(Type.String({ description: 'Element ref from browser_snapshot, e.g. "e12"' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector (CSS, text=, role=, >> chains)' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
       text: Type.String({ description: 'Text to type' }),
       submit: Type.Optional(Type.Boolean({ description: 'Press Enter after typing' })),
@@ -316,8 +325,8 @@ export default function (pi: ExtensionAPI) {
       fields: Type.Array(Type.Object({
         name: Type.String({ description: 'Human-readable field name' }),
         type: Type.String({ description: 'textbox, checkbox, radio, combobox, or slider' }),
-        ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
-        selector: Type.Optional(Type.String({ description: 'CSS selector' })),
+        ref: Type.Optional(Type.String({ description: 'Element ref from browser_snapshot, e.g. "e12"' })),
+        selector: Type.Optional(Type.String({ description: 'Playwright selector (CSS, text=, role=, >> chains)' })),
         value: Type.String({ description: 'Value to fill' }),
       }), { description: 'Fields to fill' }),
       snapshot: snapshotParam,
@@ -352,8 +361,8 @@ export default function (pi: ExtensionAPI) {
     description: 'Evaluate a JavaScript expression on the current page',
     parameters: Type.Object({
       function: Type.String({ description: '() => expression or (element) => expression' }),
-      ref: Type.Optional(Type.String({ description: 'Element reference from snapshot' })),
-      selector: Type.Optional(Type.String({ description: 'CSS selector' })),
+      ref: Type.Optional(Type.String({ description: 'Element ref from browser_snapshot, e.g. "e12"' })),
+      selector: Type.Optional(Type.String({ description: 'Playwright selector (CSS, text=, role=, >> chains)' })),
       element: Type.Optional(Type.String({ description: 'Human-readable element description' })),
     }),
     async execute(_id, params) {
