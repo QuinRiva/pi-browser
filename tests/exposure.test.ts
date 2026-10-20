@@ -6,8 +6,9 @@ function load(withToolSearch: boolean) {
   const tools = new Map<string, string>(withToolSearch ? [['tool_search', 'model-only']] : []);
   const handlers = new Map<string, Function[]>();
   let active: string[] = [];
+  const registered: any[] = [];
   const pi: any = {
-    registerTool: (tool: any) => tools.set(tool.name, tool.exposure ?? 'direct'),
+    registerTool: (tool: any) => { registered.push(tool); tools.set(tool.name, tool.exposure ?? 'direct'); },
     registerCommand: () => {},
     on: (event: string, fn: Function) => handlers.set(event, [...(handlers.get(event) ?? []), fn]),
     getAllTools: () => [...tools].map(([name, exposure]) => ({
@@ -18,7 +19,7 @@ function load(withToolSearch: boolean) {
   };
   extension(pi);
   const start = () => (handlers.get('session_start') ?? []).forEach(fn => fn({}, {}));
-  return { tools, start, active: () => active };
+  return { tools, registered, start, active: () => active };
 }
 
 describe('tool exposure', () => {
@@ -33,5 +34,7 @@ describe('tool exposure', () => {
     const pi = load(false);
     pi.start();
     expect(pi.tools.get('browser_navigate')).toBe('direct');
+    // the direct re-registration must stay sequential too
+    expect(pi.registered.every(t => t.executionMode === 'sequential')).toBe(true);
   });
 });

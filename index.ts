@@ -112,6 +112,8 @@ export default function (pi: ExtensionAPI) {
   const tools: ToolDef[] = [];
   let exposure = 'deferred';
   const registerTool = (tool: ToolDef) => {
+    // Every tool drives the same browser and page, so pi must run a batch containing one in order.
+    tool = { ...tool, executionMode: 'sequential' };
     tools.push(tool);
     pi.registerTool({ ...tool, exposure } as ToolDef);
   };
